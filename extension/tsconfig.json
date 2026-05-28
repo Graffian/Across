@@ -12,9 +12,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "paths": {
-      "~/*": ["./src/*"]
-    },
     "baseUrl": "."
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

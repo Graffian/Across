@@ -105,6 +105,79 @@ export class OpenAILLMProvider implements LLMProvider {
   }
 }
 
+export class HuggingFaceLLMProvider implements LLMProvider {
+  private apiKey: string
+  private model: string
+  private baseUrl = "https://api-inference.huggingface.co/models"
+
+  constructor() {
+    this.apiKey = process.env.HF_API_TOKEN!
+    this.model = process.env.HF_LLM_MODEL || "mistralai/Mistral-7B-Instruct-v0.3"
+  }
+
+  async chat(message: string, context: string): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` },
+        ],
+        max_tokens: 4096,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`HuggingFace error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    return data.choices?.[0]?.message?.content || "No response generated"
+  }
+
+  async summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }> {
+    const response = await fetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a summarization assistant. Create a concise summary and extract key points from the provided content. Return JSON with "summary" (2-3 sentences) and "keyPoints" (array of 3-5 bullet points).`,
+          },
+          { role: "user", content: `Summarize this content titled "${title}":\n\n${content.slice(0, 12000)}` },
+        ],
+        max_tokens: 1024,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`HuggingFace summarization error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    const text = data.choices?.[0]?.message?.content || '{"summary":"","keyPoints":[]}'
+    try {
+      return JSON.parse(text)
+    } catch {
+      return { summary: text.slice(0, 300), keyPoints: [] }
+    }
+  }
+}
+
 export class LocalLLMProvider implements LLMProvider {
   async chat(message: string, context: string): Promise<string> {
     const sources = context
@@ -115,7 +188,7 @@ export class LocalLLMProvider implements LLMProvider {
       })
       .slice(0, 3)
 
-    return `Based on your browser memory, here are the relevant sources:\n\n${sources.join("\n\n")}\n\nConnect the backend with an Anthropic or OpenAI key for full AI-powered answers.`
+    return `Based on your browser memory, here are the relevant sources:\n\n${sources.join("\n\n")}\n\nConnect the backend with an Anthropic, OpenAI, or Hugging Face key for full AI-powered answers.`
   }
 
   async summarize(_content: string, title: string): Promise<{ summary: string; keyPoints: string[] }> {
@@ -137,8 +210,11 @@ export function getLLMProvider(): LLMProvider {
   } else if (process.env.OPENAI_API_KEY) {
     console.log("Using OpenAI for chat + summarization")
     provider = new OpenAILLMProvider()
+  } else if (process.env.HF_API_TOKEN) {
+    console.log("Using Hugging Face for chat + summarization (free tier)")
+    provider = new HuggingFaceLLMProvider()
   } else {
-    console.warn("No ANTHROPIC_API_KEY or OPENAI_API_KEY set, using local fallback")
+    console.warn("No API key set, using local fallback")
     provider = new LocalLLMProvider()
   }
 

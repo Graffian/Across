@@ -19,10 +19,6 @@ async function initialize(): Promise<void> {
     }
   })
 
-  tabMonitor.onTabClose((tabId) => {
-    queueManager.enqueueImmediate(tabId, "", TAB_PRIORITY_BACKGROUND)
-  })
-
   queueManager.onProcess(async (item) => {
     await processTab(item.tabId, item.url)
   })
@@ -31,8 +27,14 @@ async function initialize(): Promise<void> {
     notifyIndexingProgress(item.tabId, "embedded", 100)
   })
 
-  queueManager.onError((item, error) => {
+  queueManager.onError(async (item, error) => {
     console.error(`Failed to process tab ${item.tabId}:`, error)
+    const tab = tabMonitor.getTab(item.tabId)
+    if (tab) {
+      tab.status = "failed"
+      tabMonitor["tabs"].set(item.tabId, tab)
+      await storeTab(tab)
+    }
     notifyIndexingProgress(item.tabId, "failed", 0)
   })
 
@@ -60,6 +62,9 @@ async function processTab(tabId: number, url: string): Promise<void> {
     }
 
     const extracted = response.content as ExtractedContent
+    if (!extracted.textContent || extracted.wordCount < 5) {
+      throw new Error("Page has no meaningful text content to index")
+    }
     notifyIndexingProgress(tabId, "extracting", 40)
 
     const chunks = chunkContent(extracted)
@@ -80,14 +85,8 @@ async function processTab(tabId: number, url: string): Promise<void> {
 
     notifyIndexingProgress(tabId, "embedded", 100)
   } catch (error) {
-    console.error(`Failed to process tab ${tabId}:`, error)
-    const currentTab = tabMonitor.getTab(tabId)
-    if (currentTab) {
-      currentTab.status = "failed"
-      tabMonitor["tabs"].set(tabId, currentTab)
-      await storeTab(currentTab)
-    }
     notifyIndexingProgress(tabId, "failed", 0)
+    throw error
   }
 }
 
@@ -208,19 +207,27 @@ async function queryLLMBackend(userMessage: string, context: string): Promise<st
   const settings = await getSettings()
   const baseUrl = settings?.backend?.baseUrl || "http://localhost:3001"
 
-  const response = await fetch(`${baseUrl}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: userMessage,
-      context,
-      model: "gpt-4o-mini",
-    }),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const data = await response.json()
-  return data.response
+  try {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: userMessage,
+        context,
+        model: "gpt-4o-mini",
+      }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    return data.response
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function generateLocalResponse(userMessage: string, results: SearchResult[]): string {

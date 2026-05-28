@@ -10,22 +10,9 @@ export function useChat() {
 
   useEffect(() => {
     loadTabs()
-    chrome.runtime.onMessage.addListener((msg) => {
+    const listener = (msg: any) => {
       if (msg.type === "TABS_LIST") {
         setTabs(msg.payload)
-      }
-      if (msg.type === "CHAT_RESPONSE") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: msg.payload.response,
-            timestamp: Date.now(),
-            sources: msg.payload.sources,
-          },
-        ])
-        setLoading(false)
       }
       if (msg.type === "TAB_SUMMARIZED" && msg.payload) {
         setSummaries((prev) => new Map(prev).set(msg.payload.tabId, msg.payload))
@@ -33,11 +20,15 @@ export function useChat() {
       if (msg.type === "INDEXING_PROGRESS") {
         loadTabs()
       }
-    })
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
   }, [])
 
   const loadTabs = () => {
-    chrome.runtime.sendMessage({ type: "GET_TABS" })
+    chrome.runtime.sendMessage({ type: "GET_TABS" }, (response) => {
+      if (response?.payload) setTabs(response.payload)
+    })
   }
 
   const sendMessage = useCallback((content: string) => {
@@ -49,10 +40,24 @@ export function useChat() {
     }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
-    chrome.runtime.sendMessage({
-      type: "CHAT_MESSAGE",
-      payload: { message: content },
-    })
+    chrome.runtime.sendMessage(
+      { type: "CHAT_MESSAGE", payload: { message: content } },
+      (response) => {
+        if (response?.payload) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: response.payload.response,
+              timestamp: Date.now(),
+              sources: response.payload.sources,
+            },
+          ])
+          setLoading(false)
+        }
+      },
+    )
   }, [])
 
   const summarizeTab = useCallback((tabId: number) => {

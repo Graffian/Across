@@ -82,9 +82,13 @@ class TabMonitor {
 
     const tab = this.tabs.get(details.tabId)
     if (tab) {
+      const urlChanged = tab.url !== details.url
       tab.url = details.url
       tab.lastAccessedTime = Date.now()
       tab.visitCount++
+      if (urlChanged) {
+        tab.status = "pending"
+      }
       this.tabs.set(details.tabId, tab)
       storeTab(tab)
       this.notifyTabUpdate(tab)
@@ -94,6 +98,7 @@ class TabMonitor {
   private upsertTab(tabId: number, tabData: chrome.tabs.Tab): void {
     const existing = this.tabs.get(tabId)
     const now = Date.now()
+    const urlChanged = existing && tabData.url && existing.url !== tabData.url
 
     const tabInfo: TabInfo = {
       tabId,
@@ -105,7 +110,7 @@ class TabMonitor {
       isBookmarked: existing?.isBookmarked ?? false,
       openTime: existing?.openTime ?? now,
       lastAccessedTime: now,
-      status: existing?.status ?? "pending",
+      status: urlChanged ? "pending" : existing?.status ?? "pending",
       visitCount: existing?.visitCount ?? 0,
     }
 

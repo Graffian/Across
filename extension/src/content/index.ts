@@ -78,7 +78,9 @@ function extractFallbackText(doc: Document): string {
     .map((p) => p.textContent?.trim())
     .filter((t): t is string => !!t && t.length > 20)
 
-  return texts.join("\n\n")
+  if (texts.length > 0) return texts.join("\n\n")
+
+  return cleanText(doc.body?.innerText || "")
 }
 
 function cleanText(text: string): string {

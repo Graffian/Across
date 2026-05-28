@@ -1,9 +1,10 @@
 import React from "react"
+import { createRoot } from "react-dom/client"
 import ChatView from "./components/ChatView"
 import { useChat } from "./hooks/useChat"
 import "../styles/globals.css"
 
-export default function SidePanel() {
+function SidePanel() {
   const {
     messages,
     tabs,
@@ -29,4 +30,9 @@ export default function SidePanel() {
       />
     </div>
   )
+}
+
+const root = document.getElementById("root")
+if (root) {
+  createRoot(root).render(<SidePanel />)
 }

@@ -74,8 +74,8 @@ export class JinaAIEmbeddingProvider implements EmbeddingProvider {
       throw new Error(`Jina AI error ${response.status}: ${body}`)
     }
 
-    const data = await response.json()
-    return data.data.map((item: { embedding: number[] }) => padToDim(item.embedding))
+    const data = await response.json() as { data: { embedding: number[] }[] }
+    return data.data.map((item) => padToDim(item.embedding))
   }
 }
 
@@ -108,9 +108,9 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
       throw new Error(`HuggingFace error ${response.status}: ${body}`)
     }
 
-    const data = await response.json()
-    const rows = Array.isArray(data[0]) ? data : [data]
-    return rows.map((r: number[]) => padToDim(r))
+    const data = await response.json() as number[][] | number[][][]
+    const rows = Array.isArray(data[0]) ? data as number[][] : [data] as number[][][]
+    return (rows as number[][]).map((r) => padToDim(r))
   }
 }
 

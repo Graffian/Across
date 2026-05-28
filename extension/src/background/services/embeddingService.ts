@@ -50,11 +50,19 @@ class LocalEmbeddingProvider implements EmbeddingProvider {
   }
 
   private hashEmbedding(text: string): number[] {
-    const seed = text.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    const vec: number[] = []
-    for (let i = 0; i < EMBEDDING_DIMENSION; i++) {
-      vec.push(Math.sin(seed * (i + 1)) * 0.5 + 0.5)
+    const vec = new Array(EMBEDDING_DIMENSION).fill(0)
+    const lower = text.toLowerCase()
+
+    for (let i = 0; i < lower.length - 2; i++) {
+      const gram = lower.slice(i, i + 3)
+      let hash = 0
+      for (let j = 0; j < gram.length; j++) {
+        hash = ((hash << 5) - hash) + gram.charCodeAt(j)
+        hash |= 0
+      }
+      vec[Math.abs(hash) % EMBEDDING_DIMENSION]++
     }
+
     const magnitude = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0))
     return magnitude > 0 ? vec.map((v) => v / magnitude) : vec
   }

@@ -1,57 +1,31 @@
 {
   "name": "across-browser-memory",
-  "displayName": "Across - Browser Memory",
   "version": "0.1.0",
-  "description": "Persistent AI memory layer for your browser. Chat with your tabs.",
-  "author": "Across",
+  "description": "Persistent AI memory layer for your browser",
   "scripts": {
-    "dev": "plasmo dev",
-    "build": "plasmo build",
-    "package": "plasmo package"
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs"
   },
   "dependencies": {
-    "plasmo": "0.89.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "@mozilla/readability": "0.5.0",
-    "js-tiktoken": "1.0.8",
-    "idb": "8.0.0",
-    "uuid": "9.0.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mozilla/readability": "^0.5.0",
+    "js-tiktoken": "^1.0.8",
+    "idb": "^8.0.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@types/chrome": "0.0.260",
-    "@types/react": "18.2.45",
-    "@types/react-dom": "18.2.18",
-    "@types/uuid": "9.0.7",
-    "@plasmohq/prettier-plugin-sort-imports": "4.0.0",
-    "typescript": "5.3.3",
-    "tailwindcss": "3.4.0",
-    "postcss": "8.4.32",
-    "autoprefixer": "10.4.16",
-    "@tailwindcss/typography": "0.5.10"
-  },
-  "manifest": {
-    "host_permissions": ["<all_urls>"],
-    "permissions": [
-      "tabs",
-      "storage",
-      "sidePanel",
-      "webNavigation",
-      "scripting"
-    ],
-    "background": {
-      "service_worker": "src/background/index.ts",
-      "persistent": false
-    },
-    "side_panel": {
-      "default_path": "src/sidepanel/index.tsx"
-    },
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["src/content/index.ts"],
-        "run_at": "document_idle"
-      }
-    ]
+    "@types/chrome": "^0.0.260",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "esbuild": "^0.19.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.16",
+    "@tailwindcss/typography": "^0.5.10"
   }
 }
