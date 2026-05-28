@@ -105,6 +105,79 @@ export class OpenAILLMProvider implements LLMProvider {
   }
 }
 
+export class GroqLLMProvider implements LLMProvider {
+  private apiKey: string
+  private model: string
+  private baseUrl = "https://api.groq.com/openai/v1/chat/completions"
+
+  constructor() {
+    this.apiKey = process.env.GROQ_API_KEY!
+    this.model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
+  }
+
+  async chat(message: string, context: string): Promise<string> {
+    const response = await fetch(this.baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` },
+        ],
+        max_tokens: 4096,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`Groq error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    return data.choices?.[0]?.message?.content || "No response generated"
+  }
+
+  async summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }> {
+    const response = await fetch(this.baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a summarization assistant. Create a concise summary and extract key points from the provided content. Return JSON with "summary" (2-3 sentences) and "keyPoints" (array of 3-5 bullet points).`,
+          },
+          { role: "user", content: `Summarize this content titled "${title}":\n\n${content.slice(0, 12000)}` },
+        ],
+        max_tokens: 1024,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`Groq summarization error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    const text = data.choices?.[0]?.message?.content || '{"summary":"","keyPoints":[]}'
+    try {
+      return JSON.parse(text)
+    } catch {
+      return { summary: text.slice(0, 300), keyPoints: [] }
+    }
+  }
+}
+
 export class HuggingFaceLLMProvider implements LLMProvider {
   private apiKey: string
   private model: string
@@ -210,6 +283,9 @@ export function getLLMProvider(): LLMProvider {
   } else if (process.env.OPENAI_API_KEY) {
     console.log("Using OpenAI for chat + summarization")
     provider = new OpenAILLMProvider()
+  } else if (process.env.GROQ_API_KEY) {
+    console.log("Using Groq (free, Llama 3) for chat + summarization")
+    provider = new GroqLLMProvider()
   } else if (process.env.HF_API_TOKEN) {
     console.log("Using Hugging Face for chat + summarization (free tier)")
     provider = new HuggingFaceLLMProvider()
