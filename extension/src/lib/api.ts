@@ -1,6 +1,7 @@
 import type { ContentChunk, TabInfo } from "./types"
 
-const BASE_URL = "http://localhost:3001"
+declare const __BACKEND_URL__: string | undefined
+const BASE_URL = typeof __BACKEND_URL__ !== "undefined" ? __BACKEND_URL__ : "http://localhost:3001"
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
   const controller = new AbortController()
@@ -37,7 +38,7 @@ export async function apiDeleteTabData(tabId: number): Promise<void> {
 }
 
 export async function apiLoadTabs(): Promise<TabInfo[]> {
-  const response = await fetchWithTimeout(`${BASE_URL}/api/tabs`)
+  const response = await fetchWithTimeout(`${BASE_URL}/api/tabs`, { method: "GET" })
   if (!response.ok) throw new Error(`Load tabs failed: ${response.status}`)
   const data = await response.json()
   return data.tabs
@@ -54,11 +55,11 @@ export async function apiSearchChunks(query: string, topK: number): Promise<{ ch
   return data.results
 }
 
-export async function apiChat(message: string): Promise<string> {
+export async function apiChat(message: string, history?: { role: string; content: string }[]): Promise<string> {
   const response = await fetchWithTimeout(`${BASE_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, history }),
   })
   if (!response.ok) throw new Error(`Chat failed: ${response.status}`)
   const data = await response.json()

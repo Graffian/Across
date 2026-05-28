@@ -150,7 +150,7 @@ export type ExtensionMessage =
   | { type: "EMBEDDINGS_READY"; tabId: number; chunks: ContentChunk[] }
   | { type: "SEARCH_QUERY"; payload: SearchQuery }
   | { type: "SEARCH_RESULTS"; payload: SearchResult[] }
-  | { type: "CHAT_MESSAGE"; payload: { message: string; sessionId?: string } }
+  | { type: "CHAT_MESSAGE"; payload: { message: string; sessionId?: string; history?: { role: string; content: string }[] } }
   | { type: "CHAT_RESPONSE"; payload: { response: string } }
   | { type: "TAB_UPDATED"; payload: Partial<TabInfo> }
   | { type: "TAB_CLOSED"; tabId: number }

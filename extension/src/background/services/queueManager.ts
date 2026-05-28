@@ -14,7 +14,7 @@ class QueueManager {
   enqueue(tabId: number, url: string, priority: QueuePriority = 4): void {
     const existing = this.queue.find((q) => q.tabId === tabId && q.status === "queued")
     if (existing) {
-      existing.priority = Math.min(existing.priority, priority)
+      existing.priority = Math.min(existing.priority, priority) as QueuePriority
       existing.updatedAt = Date.now()
       return
     }

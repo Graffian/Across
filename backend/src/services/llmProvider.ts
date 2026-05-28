@@ -5,7 +5,7 @@ import dotenv from "dotenv"
 dotenv.config()
 
 export interface LLMProvider {
-  chat(message: string, context: string): Promise<string>
+  chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string>
   summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }>
 }
 
@@ -20,18 +20,18 @@ export class AnthropicLLMProvider implements LLMProvider {
     this.model = process.env.DEFAULT_MODEL || "claude-sonnet-4-20250514"
   }
 
-  async chat(message: string, context: string): Promise<string> {
+  async chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string> {
+    const msgs = (history || []).map((h) => ({ role: h.role as "user" | "assistant", content: h.content }))
+    msgs.push({
+      role: "user",
+      content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}`,
+    })
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 4096,
       temperature: 0.3,
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}`,
-        },
-      ],
+      messages: msgs,
     })
 
     const block = response.content[0]
@@ -73,13 +73,13 @@ export class OpenAILLMProvider implements LLMProvider {
     this.model = "gpt-4o-mini"
   }
 
-  async chat(message: string, context: string): Promise<string> {
+  async chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string> {
+    const msgs: { role: "system" | "user" | "assistant"; content: string }[] = [{ role: "system", content: SYSTEM_PROMPT }]
+    if (history) msgs.push(...history.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })))
+    msgs.push({ role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` })
     const response = await this.client.chat.completions.create({
       model: this.model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` },
-      ],
+      messages: msgs,
       temperature: 0.3,
       max_tokens: 4096,
     })
@@ -115,7 +115,10 @@ export class GroqLLMProvider implements LLMProvider {
     this.model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
   }
 
-  async chat(message: string, context: string): Promise<string> {
+  async chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string> {
+    const msgs: { role: string; content: string }[] = [{ role: "system", content: SYSTEM_PROMPT }]
+    if (history) msgs.push(...history.map((h) => ({ role: h.role, content: h.content })))
+    msgs.push({ role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` })
     const response = await fetch(this.baseUrl, {
       method: "POST",
       headers: {
@@ -124,10 +127,7 @@ export class GroqLLMProvider implements LLMProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` },
-        ],
+        messages: msgs,
         max_tokens: 4096,
         temperature: 0.3,
       }),
@@ -188,7 +188,10 @@ export class HuggingFaceLLMProvider implements LLMProvider {
     this.model = process.env.HF_LLM_MODEL || "mistralai/Mistral-7B-Instruct-v0.3"
   }
 
-  async chat(message: string, context: string): Promise<string> {
+  async chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string> {
+    const msgs: { role: string; content: string }[] = [{ role: "system", content: SYSTEM_PROMPT }]
+    if (history) msgs.push(...history.map((h) => ({ role: h.role, content: h.content })))
+    msgs.push({ role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` })
     const response = await fetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -197,10 +200,7 @@ export class HuggingFaceLLMProvider implements LLMProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` },
-        ],
+        messages: msgs,
         max_tokens: 4096,
         temperature: 0.3,
       }),
@@ -252,7 +252,7 @@ export class HuggingFaceLLMProvider implements LLMProvider {
 }
 
 export class LocalLLMProvider implements LLMProvider {
-  async chat(message: string, context: string): Promise<string> {
+  async chat(message: string, context: string, _history?: { role: string; content: string }[]): Promise<string> {
     const sources = context
       .split("\n---\n")
       .map((s) => {

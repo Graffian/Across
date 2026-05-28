@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Across</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; }
+    p { margin: 0.5rem 0; }
+    ul { padding-left: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p><em>Last updated: May 2026</em></p>
+
+  <h2>Data Collection</h2>
+  <p>Across does not collect, transmit, or share any personal data with third parties. All processing is performed locally on your machine.</p>
+
+  <h2>What Data is Stored</h2>
+  <ul>
+    <li><strong>Tab content:</strong> Text extracted from web pages you visit is processed into semantic chunks and stored in a local PostgreSQL database you operate.</li>
+    <li><strong>Embeddings:</strong> Vector representations of page content are generated via Jina AI's API and stored locally in pgvector.</li>
+    <li><strong>Chat history:</strong> Your chat sessions with the AI are stored locally in IndexedDB within your browser.</li>
+    <li><strong>Tab metadata:</strong> URLs, titles, and favicons are stored locally in your PostgreSQL database.</li>
+  </ul>
+
+  <h2>Third-Party Services</h2>
+  <p>Across sends page content to the following services (both require API keys you configure):</p>
+  <ul>
+    <li><strong>Jina AI</strong> (embeddings.jina.ai) — for generating semantic embeddings of page content.</li>
+    <li><strong>Groq</strong> (api.groq.com) — for generating AI chat responses based on indexed content.</li>
+  </ul>
+  <p>You are responsible for the API keys used, and data sent to these providers is subject to their respective privacy policies.</p>
+
+  <h2>Network Requests</h2>
+  <p>All network requests are sent to the backend server you configure (default: <code>http://localhost:3001</code>). No data is sent to Across-operated servers.</p>
+
+  <h2>Changes</h2>
+  <p>This policy may be updated. Changes will be reflected on this page.</p>
+
+  <h2>Contact</h2>
+  <p>For questions, open an issue at the project repository.</p>
+</body>
+</html>

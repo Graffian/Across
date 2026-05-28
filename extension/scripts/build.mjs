@@ -6,12 +6,16 @@ import { resolve } from "path"
 const ROOT = resolve(import.meta.dirname, "..")
 const DIST = resolve(ROOT, "dist")
 
+const BACKEND_URL = JSON.stringify(process.env.BACKEND_URL || "http://localhost:3001")
+
 function log(msg) {
   console.log(`[build] ${msg}`)
 }
 
 async function main() {
   mkdirSync(DIST, { recursive: true })
+
+  log(`Backend URL: ${BACKEND_URL}`)
 
   log("Building background script...")
   await build({
@@ -21,7 +25,8 @@ async function main() {
     format: "esm",
     platform: "browser",
     target: "es2022",
-    sourcemap: true,
+    sourcemap: false,
+    define: { __BACKEND_URL__: BACKEND_URL },
   })
 
   log("Building content script...")
@@ -32,7 +37,7 @@ async function main() {
     format: "iife",
     platform: "browser",
     target: "es2022",
-    sourcemap: true,
+    define: { __BACKEND_URL__: BACKEND_URL },
   })
 
   log("Building side panel + popup (Vite)...")
@@ -45,6 +50,9 @@ async function main() {
   for (const size of [16, 48, 128]) {
     copyFileSync(resolve(ROOT, "assets", `icon-${size}.png`), resolve(DIST, `icon-${size}.png`))
   }
+
+  log("Copying privacy policy...")
+  copyFileSync(resolve(ROOT, "privacy.html"), resolve(DIST, "privacy.html"))
 
   log("Build complete!")
 }

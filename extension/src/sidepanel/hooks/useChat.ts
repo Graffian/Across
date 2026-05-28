@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import type { ChatMessage, TabInfo, SearchResult, TabSummary } from "../../lib/types"
 
 export function useChat() {
@@ -7,6 +7,7 @@ export function useChat() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"chat" | "tabs">("chat")
   const [summaries, setSummaries] = useState<Map<number, TabSummary>>(new Map())
+  const historyRef = useRef<{ role: string; content: string }[]>([])
 
   useEffect(() => {
     loadTabs()
@@ -40,10 +41,13 @@ export function useChat() {
     }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
+    historyRef.current = [...historyRef.current, { role: "user", content }]
+    const history = historyRef.current.slice(-6)
     chrome.runtime.sendMessage(
-      { type: "CHAT_MESSAGE", payload: { message: content } },
+      { type: "CHAT_MESSAGE", payload: { message: content, history } },
       (response) => {
         if (response?.payload) {
+          historyRef.current = [...historyRef.current, { role: "assistant", content: response.payload.response }]
           setMessages((prev) => [
             ...prev,
             {
@@ -75,6 +79,7 @@ export function useChat() {
 
   const clearChat = useCallback(() => {
     setMessages([])
+    historyRef.current = []
     chrome.runtime.sendMessage({ type: "CLEAR_CHAT_HISTORY" })
   }, [])
 

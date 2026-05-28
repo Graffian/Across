@@ -28,7 +28,7 @@ router.post("/", chatLimiter, async (req: Request, res: Response) => {
     }
 
     const llm = getLLMProvider()
-    const response = await llm.chat(message, ragContext)
+    const response = await llm.chat(message, ragContext, req.body.history)
 
     res.json({ response, model: model || "default" })
   } catch (error) {

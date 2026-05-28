@@ -106,7 +106,7 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
         const payload = message.payload as SearchQuery
         const results = await apiSearchChunks(payload.text, payload.topK || TOP_K_DEFAULT)
         sendResponse({ type: "SEARCH_RESULTS", payload: results })
-      } catch (error) {
+      } catch {
         sendResponse({ type: "SEARCH_RESULTS", payload: [] })
       }
       break
@@ -114,17 +114,20 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
 
     case "CHAT_MESSAGE": {
       try {
-        const { message: userMessage } = message.payload
-        const response = await apiChat(userMessage)
+        const { message: userMessage, history } = message.payload
+        const response = await apiChat(userMessage, history || [])
 
         sendResponse({
           type: "CHAT_RESPONSE",
           payload: { response },
         })
       } catch (error) {
+        const msg = error instanceof TypeError && error.message.includes("fetch")
+          ? "Couldn't reach the backend server. Make sure it's running and check your Settings."
+          : "Sorry, I encountered an error processing your question."
         sendResponse({
           type: "CHAT_RESPONSE",
-          payload: { response: "Sorry, I encountered an error processing your question." },
+          payload: { response: msg },
         })
       }
       break

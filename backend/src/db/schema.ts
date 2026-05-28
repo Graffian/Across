@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS chunks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-DROP TABLE IF EXISTS embeddings CASCADE;
-
 CREATE TABLE IF NOT EXISTS embeddings (
     chunk_id UUID PRIMARY KEY REFERENCES chunks(chunk_id) ON DELETE CASCADE,
     vector vector(1024) NOT NULL,
