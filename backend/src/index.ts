@@ -9,6 +9,7 @@ import { apiLimiter } from "./middleware/rateLimit"
 import embeddingsRouter from "./routes/embeddings"
 import chatRouter from "./routes/chat"
 import searchRouter from "./routes/search"
+import tabsRouter from "./routes/tabs"
 
 dotenv.config()
 
@@ -28,6 +29,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/embeddings", embeddingsRouter)
 app.use("/api/chat", chatRouter)
 app.use("/api/search", searchRouter)
+app.use("/api/tabs", tabsRouter)
 
 app.use(errorHandler)
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express"
 import { getEmbeddingProvider } from "../services/embeddingProvider"
+import { storeChunks } from "../services/vectorStore"
 import { embeddingLimiter } from "../middleware/rateLimit"
 import { v4 as uuidv4 } from "uuid"
 
@@ -45,7 +46,6 @@ router.post("/store", async (req: Request, res: Response) => {
       return
     }
 
-    const { storeChunks } = await import("../services/vectorStore")
     await storeChunks(chunks, embeddings)
 
     res.json({ success: true, stored: chunks.length })

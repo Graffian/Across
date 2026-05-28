@@ -51,7 +51,6 @@ export function useChat() {
               role: "assistant",
               content: response.payload.response,
               timestamp: Date.now(),
-              sources: response.payload.sources,
             },
           ])
           setLoading(false)

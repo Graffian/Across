@@ -3,11 +3,10 @@ import { queueManager } from "./services/queueManager"
 import { chunkContent } from "./services/chunkingPipeline"
 import { embedChunks } from "./services/embeddingService"
 import { generateSummary } from "./services/summarizationService"
-import type { ExtractedContent, ContentChunk, TabInfo, SearchQuery, SearchResult, ChatMessage, ChatSession, ExtensionSettings } from "../lib/types"
-import { storeChunks, storeTab, getChunksByTabId, deleteChunksByTabId, searchChunksLocally, getEmbedding, getSettings, storeSettings, getChatSessions, storeChatSession, clearAllChatSessions, deleteTab, getAllTabs } from "../lib/indexedDB"
+import type { ExtractedContent, TabInfo, SearchQuery } from "../lib/types"
+import { getChatSessions, clearAllChatSessions } from "../lib/indexedDB"
 import { TAB_PRIORITY_ACTIVE, TAB_PRIORITY_RECENT, TAB_PRIORITY_PINNED, TAB_PRIORITY_BACKGROUND, TOP_K_DEFAULT } from "../lib/constants"
-import { generateEmbedding } from "./services/embeddingService"
-import { v4 as uuidv4 } from "uuid"
+import { apiSearchChunks, apiDeleteTabData, apiChat } from "../lib/api"
 
 async function initialize(): Promise<void> {
   await tabMonitor.initialize()
@@ -33,7 +32,6 @@ async function initialize(): Promise<void> {
     if (tab) {
       tab.status = "failed"
       tabMonitor["tabs"].set(item.tabId, tab)
-      await storeTab(tab)
     }
     notifyIndexingProgress(item.tabId, "failed", 0)
   })
@@ -70,9 +68,6 @@ async function processTab(tabId: number, url: string): Promise<void> {
     const chunks = chunkContent(extracted)
     notifyIndexingProgress(tabId, "chunked", 60)
 
-    await storeChunks(chunks)
-    notifyIndexingProgress(tabId, "chunked", 70)
-
     await embedChunks(chunks)
     notifyIndexingProgress(tabId, "embedded", 90)
 
@@ -80,7 +75,6 @@ async function processTab(tabId: number, url: string): Promise<void> {
     if (currentTab) {
       currentTab.status = "embedded"
       tabMonitor["tabs"].set(tabId, currentTab)
-      await storeTab(currentTab)
     }
 
     notifyIndexingProgress(tabId, "embedded", 100)
@@ -105,23 +99,10 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
       break
     }
 
-    case "GET_SETTINGS": {
-      const settings = await getSettings()
-      sendResponse({ type: "SETTINGS_READY", payload: settings })
-      break
-    }
-
-    case "SETTINGS_UPDATED": {
-      await storeSettings(message.payload)
-      sendResponse({ success: true })
-      break
-    }
-
     case "SEARCH_QUERY": {
       try {
-        const query = message.payload as SearchQuery
-        const queryEmbedding = await generateEmbedding(query.text)
-        const results = await searchChunksLocally(queryEmbedding, query.topK || TOP_K_DEFAULT)
+        const payload = message.payload as SearchQuery
+        const results = await apiSearchChunks(payload.text, payload.topK || TOP_K_DEFAULT)
         sendResponse({ type: "SEARCH_RESULTS", payload: results })
       } catch (error) {
         sendResponse({ type: "SEARCH_RESULTS", payload: [] })
@@ -131,39 +112,17 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
 
     case "CHAT_MESSAGE": {
       try {
-        const { message: userMessage, sessionId } = message.payload
-        const queryEmbedding = await generateEmbedding(userMessage)
-        const results = await searchChunksLocally(queryEmbedding, TOP_K_DEFAULT)
-
-        const context = results
-          .map((r) => `[Source: ${r.chunk.title}] (${r.chunk.url})\n${r.chunk.content}`)
-          .join("\n\n---\n\n")
-
-        const settings = await getSettings()
-        let response: string
-
-        if (settings?.backend?.enabled) {
-          response = await queryLLMBackend(userMessage, context)
-        } else {
-          response = generateLocalResponse(userMessage, results)
-        }
-
-        const chatMessage: ChatMessage = {
-          id: uuidv4(),
-          role: "assistant",
-          content: response,
-          timestamp: Date.now(),
-          sources: results.slice(0, 3),
-        }
+        const { message: userMessage } = message.payload
+        const response = await apiChat(userMessage)
 
         sendResponse({
           type: "CHAT_RESPONSE",
-          payload: { response, sources: results.slice(0, 3) },
+          payload: { response },
         })
       } catch (error) {
         sendResponse({
           type: "CHAT_RESPONSE",
-          payload: { response: "Sorry, I encountered an error processing your question.", sources: [] },
+          payload: { response: "Sorry, I encountered an error processing your question." },
         })
       }
       break
@@ -183,8 +142,8 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
 
     case "DELETE_TAB_DATA": {
       const tabId = message.tabId
-      await deleteChunksByTabId(tabId)
-      await deleteTab(tabId)
+      await apiDeleteTabData(tabId)
+      tabMonitor["tabs"].delete(tabId)
       sendResponse({ success: true })
       break
     }
@@ -201,46 +160,6 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
   }
 
   return true
-}
-
-async function queryLLMBackend(userMessage: string, context: string): Promise<string> {
-  const settings = await getSettings()
-  const baseUrl = settings?.backend?.baseUrl || "http://localhost:3001"
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
-
-  try {
-    const response = await fetch(`${baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: userMessage,
-        context,
-        model: "gpt-4o-mini",
-      }),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const data = await response.json()
-    return data.response
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
-function generateLocalResponse(userMessage: string, results: SearchResult[]): string {
-  if (results.length === 0) {
-    return "I couldn't find any relevant content from your tabs to answer that question."
-  }
-
-  const topResults = results.slice(0, 3)
-  const sources = topResults
-    .map((r) => `- "${r.chunk.title}" (${r.chunk.url}) — *${r.chunk.content.slice(0, 150)}...*`)
-    .join("\n")
-
-  return `Based on your browser memory, here's what I found:\n\n${sources}\n\nI found ${results.length} relevant passages. Try connecting to the backend AI service for more detailed answers with full context-aware responses.`
 }
 
 initialize().catch(console.error)

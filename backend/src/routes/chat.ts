@@ -20,10 +20,11 @@ router.post("/", chatLimiter, async (req: Request, res: Response) => {
     if (!ragContext) {
       const embeddingProvider = getEmbeddingProvider()
       const queryEmbedding = await embeddingProvider.embed(message)
-      const results = await searchSimilar(queryEmbedding, 10)
+      const results = await searchSimilar(queryEmbedding, 5)
       ragContext = results
-        .map((r) => `[Source: ${r.chunk.title}] (${r.chunk.url})\n${r.chunk.content}`)
+        .map((r) => `[Source: ${r.chunk.title}] (${r.chunk.url})\n${r.chunk.content.slice(0, 1000)}`)
         .join("\n\n---\n\n")
+        .slice(0, 8000)
     }
 
     const llm = getLLMProvider()

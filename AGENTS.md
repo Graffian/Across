@@ -2,23 +2,23 @@
 
 ## Project Overview
 
-AI-powered Chrome extension that indexes browser tab content, stores semantic embeddings, and provides a chat interface for querying all previously viewed tabs.
+AI-powered Chrome extension that indexes browser tab content, stores semantic embeddings in PostgreSQL with pgvector, and provides a chat interface for querying all previously viewed tabs.
 
 ## Architecture
 
 ```
-Extension (Plasmo + React + TypeScript)
+Extension (React + TypeScript)
 ├── Background Service Worker
-│   ├── TabMonitor - tracks tab lifecycle
+│   ├── TabMonitor - tracks tab lifecycle (syncs to backend)
 │   ├── QueueManager - priority-based async processing
 │   ├── ChunkingPipeline - heading-aware semantic chunking
-│   ├── EmbeddingService - provider abstraction for embeddings
-│   └── SummarizationService - lazy tab summarization
+│   ├── EmbeddingService - embed + store to backend
+│   └── SummarizationService - lazy tab summarization (via backend)
 ├── Content Script
 │   └── Readability extraction (Mozilla Readability)
 ├── Side Panel UI (React + Tailwind)
 │   ├── ChatView - main chat interface
-│   ├── MessageBubble - message display with sources
+│   ├── MessageBubble - message display
 │   ├── ChatInput - input with keyboard shortcuts
 │   ├── TabList - indexed tab browser
 │   └── useChat - React hook for state management
@@ -26,21 +26,22 @@ Extension (Plasmo + React + TypeScript)
 └── Lib (shared utilities)
     ├── types.ts - all TypeScript interfaces
     ├── constants.ts - configuration values
-    ├── indexedDB.ts - local storage layer
-    └── messageTypes.ts - Chrome messaging
+    ├── api.ts - backend HTTP client
+    └── indexedDB.ts - chat sessions only (ephemeral)
 
 Backend (Node.js + Express + PostgreSQL)
 ├── Routes
-│   ├── /api/embeddings - generate/store embeddings
-│   ├── /api/chat - RAG-based chat
-│   └── /api/search - semantic search
+│   ├── /api/tabs - CRUD tab state
+│   ├── /api/embeddings - generate + store embeddings
+│   ├── /api/chat - RAG-based chat (pgvector search + LLM)
+│   └── /api/search - semantic search via pgvector
 ├── Services
-│   ├── embeddingProvider - OpenAI/local abstraction
-│   ├── llmProvider - OpenAI/local chat abstraction
-│   └── vectorStore - pgvector storage/retrieval
+│   ├── embeddingProvider - Jina AI / Hugging Face / OpenAI
+│   ├── llmProvider - Groq / Hugging Face / OpenAI / Anthropic
+│   └── vectorStore - pgvector storage + similarity search
 └── DB
     ├── pool.ts - PostgreSQL connection
-    ├── schema.ts - pgvector schema
+    ├── schema.ts - pgvector schema (vector 1024d)
     └── migrations.ts - run migrations
 ```
 
@@ -64,7 +65,7 @@ Backend (Node.js + Express + PostgreSQL)
 ### State Management
 - Extension: React hooks (useState, useCallback)
 - Background: Class singletons (TabMonitor, QueueManager)
-- Storage: IndexedDB via idb library
+- Storage: PostgreSQL + pgvector (primary), IndexedDB (chat sessions only)
 
 ### Message Passing
 - Use `chrome.runtime.sendMessage` for extension-wide
@@ -73,34 +74,62 @@ Backend (Node.js + Express + PostgreSQL)
 
 ## Development Commands
 
-### Extension
-```bash
-cd extension
-npm install
-npm run dev    # Start Plasmo dev server
-npm run build  # Build for production
-```
-
 ### Backend
 ```bash
 cd backend
 npm install
-cp .env.example .env  # Configure env vars
-npm run db:migrate    # Run PostgreSQL migrations
-npm run dev           # Start dev server
+cp .env.example .env  # Configure env vars + DATABASE_URL
+npm run dev           # Starts server + runs migrations
 ```
+
+### Extension
+```bash
+cd extension
+npm install
+npm run build  # Build to dist/
+```
+
+Load in Chrome: `chrome://extensions` → Developer mode → Load unpacked → select `extension/dist`
+
+## Data Flow
+
+### Tab Indexing
+1. TabMonitor detects new/updated tab → enqueues in QueueManager
+2. Content script extracts page text via Readability
+3. ChunkingPipeline splits into 800-token chunks with 150 overlap
+4. EmbeddingService sends chunks to backend for Jina AI embedding
+5. Backend stores chunks + embeddings in PostgreSQL (chunks + embeddings tables)
+6. TabMonitor upserts tab state to backend (tabs table)
+
+### Chat Query
+1. User types question in ChatView → useChat sends CHAT_MESSAGE to background
+2. Background calls POST /api/chat with `{ message }`
+3. Backend embeds query via Jina AI, searches pgvector cosine similarity
+4. Backend sends top chunks + question to Groq LLM for RAG answer
+5. Response returned to extension and displayed
+
+### Startup / Restore
+1. TabMonitor.initialize() calls GET /api/tabs to load stored tab state
+2. Syncs with Chrome's open tabs via tabs.query
+3. Tabs with "pending" status enqueued for re-indexing
+
+### Tab Close / URL Change
+1. TabMonitor detects tab removal or URL change
+2. Calls DELETE /api/tabs/:tabId
+3. Backend removes rows from embeddings, chunks, summaries, and tabs tables
 
 ## Testing Checklist
 
 - [ ] Extension loads without errors
 - [ ] Content script extracts readable content
 - [ ] Chunks are created with proper overlap
-- [ ] IndexedDB stores/retrieves correctly
+- [ ] Backend stores chunks in PostgreSQL
+- [ ] Backend stores embeddings in pgvector
+- [ ] pgvector search returns relevant results
 - [ ] Side panel opens and displays chat
-- [ ] Messages are sent/received
-- [ ] Backend starts and responds to health check
-- [ ] Embeddings endpoint works
-- [ ] Search returns relevant results
+- [ ] Chat messages return RAG answers from backend
+- [ ] Tab close deletes data from PostgreSQL
+- [ ] Extension restart restores tab state from backend
 
 ## Performance Rules
 

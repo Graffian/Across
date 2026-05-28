@@ -1,6 +1,6 @@
 import type { TabInfo, TabStatus } from "../../lib/types"
 import { URL_PATTERNS_TO_SKIP } from "../../lib/constants"
-import { storeTab, getTab, getAllTabs, deleteTab } from "../../lib/indexedDB"
+import { apiStoreTab, apiDeleteTabData, apiLoadTabs } from "../../lib/api"
 
 class TabMonitor {
   private tabs: Map<number, TabInfo> = new Map()
@@ -9,9 +9,13 @@ class TabMonitor {
   private activeTabId: number | null = null
 
   async initialize(): Promise<void> {
-    const storedTabs = await getAllTabs()
-    for (const tab of storedTabs) {
-      this.tabs.set(tab.tabId, tab)
+    try {
+      const storedTabs = await apiLoadTabs()
+      for (const tab of storedTabs) {
+        this.tabs.set(tab.tabId, tab)
+      }
+    } catch {
+      console.warn("Failed to load tabs from backend, starting fresh")
     }
 
     const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -64,7 +68,7 @@ class TabMonitor {
       tab.isActive = true
       tab.lastAccessedTime = Date.now()
       this.tabs.set(activeInfo.tabId, tab)
-      storeTab(tab)
+      apiStoreTab(tab).catch(() => {})
       this.notifyTabUpdate(tab)
     }
   }
@@ -72,7 +76,7 @@ class TabMonitor {
   private handleTabRemoved(tabId: number): void {
     const tab = this.tabs.get(tabId)
     this.tabs.delete(tabId)
-    deleteTab(tabId)
+    apiDeleteTabData(tabId).catch(() => {})
     this.notifyTabClose(tabId)
   }
 
@@ -88,9 +92,10 @@ class TabMonitor {
       tab.visitCount++
       if (urlChanged) {
         tab.status = "pending"
+        apiDeleteTabData(details.tabId).catch(() => {})
       }
       this.tabs.set(details.tabId, tab)
-      storeTab(tab)
+      apiStoreTab(tab).catch(() => {})
       this.notifyTabUpdate(tab)
     }
   }
@@ -115,7 +120,7 @@ class TabMonitor {
     }
 
     this.tabs.set(tabId, tabInfo)
-    storeTab(tabInfo)
+    apiStoreTab(tabInfo).catch(() => {})
     this.notifyTabUpdate(tabInfo)
   }
 

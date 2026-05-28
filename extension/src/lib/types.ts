@@ -90,7 +90,6 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   timestamp: number
-  sources?: SearchResult[]
 }
 
 export interface ChatSession {
@@ -152,7 +151,7 @@ export type ExtensionMessage =
   | { type: "SEARCH_QUERY"; payload: SearchQuery }
   | { type: "SEARCH_RESULTS"; payload: SearchResult[] }
   | { type: "CHAT_MESSAGE"; payload: { message: string; sessionId?: string } }
-  | { type: "CHAT_RESPONSE"; payload: { response: string; sources: SearchResult[] } }
+  | { type: "CHAT_RESPONSE"; payload: { response: string } }
   | { type: "TAB_UPDATED"; payload: Partial<TabInfo> }
   | { type: "TAB_CLOSED"; tabId: number }
   | { type: "TAB_ACTIVATED"; tabId: number }

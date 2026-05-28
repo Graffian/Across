@@ -169,6 +169,7 @@ export async function clearAllData(): Promise<void> {
   await db.clear(TABS_STORE)
   await db.clear(SUMMARIES_STORE)
   await db.clear(CHAT_STORE)
+  await db.clear(SETTINGS_STORE)
 }
 
 export async function searchChunksLocally(

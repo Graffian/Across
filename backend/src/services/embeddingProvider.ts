@@ -3,7 +3,7 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-const TARGET_DIM = 1536
+const TARGET_DIM = 1024
 
 function padToDim(vec: number[], target = TARGET_DIM): number[] {
   if (vec.length >= target) return vec
@@ -66,6 +66,7 @@ export class JinaAIEmbeddingProvider implements EmbeddingProvider {
         input: texts,
         task: "retrieval.query",
         dimensions: 1024,
+        truncate: true,
       }),
     })
 

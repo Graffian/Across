@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from "react"
 import MessageBubble from "./MessageBubble"
 import ChatInput from "./ChatInput"
 import TabList from "./TabList"
-import SettingsPanel from "./SettingsPanel"
 import type { ChatMessage, TabInfo, TabSummary } from "../../lib/types"
 
 interface Props {
@@ -35,7 +34,6 @@ export default function ChatView({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [tabView, setTabView] = useState<"chat" | "tabs">("chat")
-  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -47,41 +45,41 @@ export default function ChatView({
 
   return (
     <div className="flex h-full flex-col bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-across-600 text-xs font-bold text-white">A</div>
+      <header className="flex items-center justify-between border-b border-slate-700/50 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-across-500 to-across-700 text-xs font-bold text-white shadow-sm">
+            A
+          </div>
           <span className="text-sm font-semibold text-slate-200">Across</span>
+          {messages.length > 0 && (
+            <button onClick={onClearChat} className="ml-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300">
+              Clear
+            </button>
+          )}
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => setTabView("chat")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              tabView === "chat" ? "bg-across-600 text-white" : "text-slate-400 hover:bg-slate-800"
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              tabView === "chat"
+                ? "bg-across-600 text-white shadow-sm"
+                : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"
             }`}
           >
             Chat
           </button>
           <button
             onClick={() => setTabView("tabs")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              tabView === "tabs" ? "bg-across-600 text-white" : "text-slate-400 hover:bg-slate-800"
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              tabView === "tabs"
+                ? "bg-across-600 text-white shadow-sm"
+                : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"
             }`}
           >
-            Tabs ({embeddedCount})
-          </button>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="rounded-lg px-2 py-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
-            title="Settings"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            Tabs{embeddedCount > 0 ? <span className="ml-1.5 rounded-full bg-slate-600 px-1.5 py-0.5 text-[10px] tabular-nums">{embeddedCount}</span> : null}
           </button>
         </div>
-      </div>
-      <SettingsPanel open={showSettings} onClose={() => setShowSettings(false)} />
+      </header>
 
       {tabView === "tabs" ? (
         <div className="flex-1 overflow-y-auto">
@@ -89,11 +87,13 @@ export default function ChatView({
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto">
             {messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-across-600/20">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-across-600 text-xl font-bold text-white">A</div>
+              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-across-500/20 to-across-700/20 ring-1 ring-across-500/10">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-across-500 to-across-700 text-lg font-bold text-white shadow-lg">
+                    A
+                  </div>
                 </div>
                 <h2 className="text-lg font-semibold text-slate-200">Browser Memory</h2>
                 <p className="mt-1 max-w-[260px] text-sm text-slate-500">
@@ -105,28 +105,34 @@ export default function ChatView({
                     <button
                       key={i}
                       onClick={() => onSend(s)}
-                      className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-left text-xs text-slate-400 transition-colors hover:border-across-600 hover:text-slate-300"
+                      className="group rounded-lg border border-slate-700/50 bg-slate-800/30 px-3.5 py-2.5 text-left text-xs text-slate-400 transition-all hover:border-across-500/50 hover:bg-slate-800/80 hover:text-slate-200"
                     >
+                      <span className="mr-2 text-across-500 opacity-0 transition-opacity group-hover:opacity-100">&rarr;</span>
                       {s}
                     </button>
                   ))}
                 </div>
 
                 {tabs.length > 0 && (
-                  <p className="mt-4 text-[10px] text-slate-600">
-                    {tabs.length} tabs indexed &middot; {embeddedCount} embedded
-                  </p>
+                  <div className="mt-6 flex items-center gap-3 text-[10px] text-slate-600">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      {embeddedCount} embedded
+                    </span>
+                    <span className="text-slate-700">|</span>
+                    <span>{tabs.length} tracked</span>
+                  </div>
                 )}
               </div>
             ) : (
-              <div>
+              <div className="px-4 pb-2 pt-4">
                 {messages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} />
                 ))}
                 {loading && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl bg-slate-700 px-4 py-3">
-                      <div className="flex gap-1">
+                  <div className="flex justify-start pb-3">
+                    <div className="rounded-2xl rounded-bl-md bg-slate-700/80 px-4 py-3">
+                      <div className="flex gap-1.5">
                         <div className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
                         <div className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
                         <div className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
