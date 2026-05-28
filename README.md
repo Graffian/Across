@@ -1,23 +1,23 @@
-# Across - Browser Memory
+# Across — Browser Memory
 
-> ChatGPT for your browser history and open tabs.
+> ChatGPT for your browser history and open tabs. No OpenAI needed — works with Claude + free Jina AI embeddings.
 
-Across is an AI-powered Chrome extension that indexes content from open tabs, stores semantic memory using embeddings, and allows you to chat with all previously viewed tabs.
+Across indexes content from open tabs, stores semantic memory using embeddings, and lets you chat with everything you've viewed.
 
 ## Features
 
-- **Tab Monitoring** - Automatically detects and tracks tab lifecycle
-- **Content Extraction** - Clean article extraction using Mozilla Readability
-- **Semantic Chunking** - Heading-aware splitting with token overlap
-- **Embedding System** - OpenAI or local embedding provider abstraction
-- **Vector Search** - pgvector-backed cosine similarity retrieval
-- **AI Chat** - RAG-based responses from your browser memory
-- **Lazy Summarization** - On-demand tab summarization
-- **Local-First** - IndexedDB storage, works without cloud dependency
+- **Tab Monitoring** — auto-detects tabs, URL changes, activation, close
+- **Content Extraction** — clean article extraction via Mozilla Readability
+- **Semantic Chunking** — heading-aware splitting with token overlap (800 target, 150 overlap)
+- **Embedding System** — pluggable providers: Jina AI (free), Hugging Face (free), OpenAI
+- **Priority Queue** — active > recent > pinned > background, debounced, 2 concurrent max
+- **AI Chat** — RAG-based answers using Claude (or OpenAI)
+- **Lazy Summarization** — on-demand, not automatic
+- **Local-First** — IndexedDB storage, backend is optional for basic use
 
 ## Quick Start
 
-### Extension
+### 1. Extension
 
 ```bash
 cd extension
@@ -25,66 +25,80 @@ npm install
 npm run dev
 ```
 
-Load the extension in Chrome:
-1. Navigate to `chrome://extensions`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select the `extension/build` folder
+Load in Chrome:
+1. `chrome://extensions` → Developer mode → Load unpacked
+2. Select `extension/build`
 
-### Backend
+The extension works standalone (local-only mode) with hash-based keyword matching.
+
+### 2. Backend (for real AI)
 
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your OpenAI API key
-npm run db:migrate
+```
+
+Edit `.env` — you only need **two keys**:
+
+```env
+ANTHROPIC_API_KEY=sk-ant-your-key-here   # Claude for chat
+JINA_API_KEY=jina_your_key_here          # Jina AI for embeddings (free tier)
+```
+
+Start the server:
+
+```bash
 npm run dev
 ```
+
+That's it. No OpenAI required.
+
+## Embedding Providers
+
+| Provider | Key | Quality | Cost |
+|----------|-----|---------|------|
+| **Jina AI** | `JINA_API_KEY` | ✅ Semantic | **Free** (1M tokens) |
+| Hugging Face | `HF_API_TOKEN` | ✅ Semantic | **Free** (rate-limited) |
+| OpenAI | `OPENAI_API_KEY` | ✅ Semantic | Paid |
+| Hash fallback | none | ⚠️ Keyword | Free |
+
+Priority: `JINA_API_KEY` → `OPENAI_API_KEY` → `HF_API_TOKEN` → hash fallback.
+
+## LLM Providers
+
+| Provider | Key | Used for |
+|----------|-----|----------|
+| **Anthropic Claude** | `ANTHROPIC_API_KEY` | Chat + summarization |
+| OpenAI | `OPENAI_API_KEY` | Chat + summarization (fallback) |
+| Local | none | Keyword-only response |
+
+Priority: `ANTHROPIC_API_KEY` → `OPENAI_API_KEY` → local fallback.
+
+## How It Works
+
+1. **Index** — background worker monitors tabs, extracts content via Readability
+2. **Chunk** — heading-aware splitting into ~800-token chunks with overlap
+3. **Embed** — chunks sent to backend for vector embedding (Jina/OpenAI/HF)
+4. **Store** — IndexedDB (local) + pgvector (optional)
+5. **Query** — user asks question in side panel
+6. **Retrieve** — query embedded, top-k chunks found via cosine similarity
+7. **Answer** — relevant chunks + question sent to Claude for RAG response
 
 ## Architecture
 
 ```
-Extension                    Backend
-┌─────────────┐             ┌─────────────┐
-│ Tab Monitor │             │ Express API │
-│   ↓         │             │   ↓         │
-│ Chunking    │────HTTP────│ pgvector    │
-│   ↓         │             │   ↓         │
-│ Embedding   │             │ OpenAI/Claude│
-│   ↓         │             └─────────────┘
-│ IndexedDB   │
-│   ↓         │
-│ Side Panel  │
-│   (React)   │
-└─────────────┘
-```
-
-## How It Works
-
-1. **Index** - Extension monitors tabs, extracts content, chunks and embeds it
-2. **Store** - Chunks stored in IndexedDB (local) + pgvector (backend)
-3. **Query** - User asks question in side panel chat
-4. **Retrieve** - Query embedded, relevant chunks found via cosine similarity
-5. **Answer** - Context sent to LLM for RAG response
-
-## Tech Stack
-
-- **Extension**: Plasmo, React, TypeScript, Tailwind
-- **Backend**: Node.js, Express, PostgreSQL + pgvector
-- **AI**: OpenAI (embeddings + chat), Claude (alternative)
-- **Storage**: IndexedDB (local), pgvector (backend)
-
-## Environment Variables
-
-### Backend (.env)
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/across
-OPENAI_API_KEY=sk-your-key-here
-PORT=3001
-DEFAULT_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small
+Extension (Plasmo)                    Backend (Express)
+┌─────────────────────┐             ┌──────────────────────┐
+│  TabMonitor         │             │  /api/embeddings     │
+│  QueueManager       │──HTTP──────│  Jina │ OpenAI │ HF  │
+│  ChunkingPipeline   │             ├──────────────────────┤
+│  EmbeddingService   │             │  /api/chat           │
+│  IndexedDB          │             │  Claude │ OpenAI     │
+│  Side Panel (React) │             ├──────────────────────┤
+│  Popup              │             │  /api/search         │
+└─────────────────────┘             │  pgvector            │
+                                    └──────────────────────┘
 ```
 
 ## Project Structure
@@ -93,23 +107,41 @@ EMBEDDING_MODEL=text-embedding-3-small
 across/
 ├── extension/
 │   ├── src/
-│   │   ├── background/        # Service worker + services
-│   │   ├── content/           # Content script (Readability)
-│   │   ├── sidepanel/         # React chat UI
-│   │   ├── popup/             # Quick access popup
-│   │   └── lib/               # Shared types and utilities
+│   │   ├── background/services/   # TabMonitor, QueueManager, Chunking, Embedding, Summarization
+│   │   ├── content/               # Readability extraction
+│   │   ├── sidepanel/             # React chat UI (ChatView, MessageBubble, ChatInput, TabList)
+│   │   ├── popup/                 # Quick access panel
+│   │   └── lib/                   # Types, constants, IndexedDB, messaging
 │   ├── package.json
 │   └── tailwind.config.js
 ├── backend/
 │   ├── src/
-│   │   ├── routes/            # API endpoints
-│   │   ├── services/          # Business logic
-│   │   ├── db/                # Database layer
-│   │   └── middleware/        # Rate limiting, error handling
+│   │   ├── routes/                # embeddings, chat, search
+│   │   ├── services/              # embeddingProvider, llmProvider, vectorStore
+│   │   ├── db/                    # pool, schema, migrations
+│   │   └── middleware/            # rateLimit, errorHandler
 │   ├── package.json
 │   └── .env.example
+├── .gitignore
 ├── AGENTS.md
 └── README.md
+```
+
+## Environment Variables
+
+```env
+# Pick ONE embedding provider (free options available):
+JINA_API_KEY=jina_your_key_here     # Free tier, 1M tokens
+# OPENAI_API_KEY=sk-...             # Paid, best quality
+# HF_API_TOKEN=hf_...               # Free, rate-limited
+
+# Anthropic for chat (what you have):
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Database (optional — extension works locally without it):
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/across
+
+PORT=3001
 ```
 
 ## API Endpoints
@@ -123,6 +155,10 @@ across/
 | POST | `/api/chat` | RAG-based chat |
 | POST | `/api/chat/summarize` | Summarize content |
 
-## License
+## Getting Free API Keys
+
+**Jina AI** (embeddings): [jina.ai/embeddings](https://jina.ai/embeddings) — sign up, get key, 1M free tokens
+
+**Anthropic Claude** (chat): [console.anthropic.com](https://console.anthropic.com) — sign up, get API key
 
 MIT
