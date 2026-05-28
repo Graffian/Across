@@ -167,3 +167,4 @@ export type ExtensionMessage =
   | { type: "SUMMARIZE_TAB"; tabId: number }
   | { type: "TAB_SUMMARIZED"; payload: TabSummary }
   | { type: "INDEXING_PROGRESS"; payload: { tabId: number; status: TabStatus; progress: number } }
+  | { type: "TAB_REMOVED"; payload: { tabId: number } }

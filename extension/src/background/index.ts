@@ -72,10 +72,12 @@ async function processTab(tabId: number, url: string): Promise<void> {
     notifyIndexingProgress(tabId, "embedded", 90)
 
     const currentTab = tabMonitor.getTab(tabId)
-    if (currentTab) {
-      currentTab.status = "embedded"
-      tabMonitor["tabs"].set(tabId, currentTab)
+    if (!currentTab) {
+      await apiDeleteTabData(tabId)
+      return
     }
+    currentTab.status = "embedded"
+    tabMonitor["tabs"].set(tabId, currentTab)
 
     notifyIndexingProgress(tabId, "embedded", 100)
   } catch (error) {
@@ -144,6 +146,7 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
       const tabId = message.tabId
       await apiDeleteTabData(tabId)
       tabMonitor["tabs"].delete(tabId)
+      chrome.runtime.sendMessage({ type: "TAB_REMOVED", payload: { tabId } }).catch(() => {})
       sendResponse({ success: true })
       break
     }

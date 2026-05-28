@@ -17,7 +17,7 @@ export function useChat() {
       if (msg.type === "TAB_SUMMARIZED" && msg.payload) {
         setSummaries((prev) => new Map(prev).set(msg.payload.tabId, msg.payload))
       }
-      if (msg.type === "INDEXING_PROGRESS") {
+      if (msg.type === "INDEXING_PROGRESS" || msg.type === "TAB_REMOVED") {
         loadTabs()
       }
     }

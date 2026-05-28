@@ -76,8 +76,9 @@ class TabMonitor {
   private handleTabRemoved(tabId: number): void {
     const tab = this.tabs.get(tabId)
     this.tabs.delete(tabId)
-    apiDeleteTabData(tabId).catch(() => {})
+    apiDeleteTabData(tabId).catch((err) => console.error(`Failed to delete tab ${tabId} from backend:`, err))
     this.notifyTabClose(tabId)
+    chrome.runtime.sendMessage({ type: "TAB_REMOVED", payload: { tabId } }).catch(() => {})
   }
 
   private handleNavigationCompleted(details: chrome.webNavigation.WebNavigationFramedCallbackDetails): void {
