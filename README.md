@@ -4,6 +4,10 @@
 
 Across indexes content from open tabs, stores semantic memory in PostgreSQL with pgvector, and lets you chat with everything you've viewed.
 
+## Demo
+
+![Across Demo](media/demo.mp4)
+
 ## Features
 
 - **Tab Monitoring** — auto-detects tabs, URL changes, activation, close
