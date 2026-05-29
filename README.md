@@ -6,7 +6,7 @@ Across indexes content from open tabs, stores semantic memory in PostgreSQL with
 
 ## Demo
 
-<video src="media/demo.mp4" controls width="100%"></video>
+[![Across Demo](https://img.youtube.com/vi/JgB8mYWmsAU/maxresdefault.jpg)](https://youtu.be/JgB8mYWmsAU)
 
 ## Features
 
