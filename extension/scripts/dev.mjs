@@ -6,6 +6,8 @@ import { resolve } from "path"
 const ROOT = resolve(import.meta.dirname, "..")
 const DIST = resolve(ROOT, "dist")
 
+const BACKEND_URL = JSON.stringify(process.env.BACKEND_URL || "http://localhost:3001")
+
 function log(msg) {
   console.log(`[dev] ${msg}`)
 }
@@ -13,6 +15,8 @@ function log(msg) {
 async function main() {
   mkdirSync(DIST, { recursive: true })
   copyFileSync(resolve(ROOT, "manifest.json"), resolve(DIST, "manifest.json"))
+
+  log(`Backend URL: ${BACKEND_URL}`)
 
   log("Watching background script...")
   const bgCtx = await context({
@@ -23,6 +27,7 @@ async function main() {
     platform: "browser",
     target: "es2022",
     sourcemap: true,
+    define: { __BACKEND_URL__: BACKEND_URL },
   })
   await bgCtx.watch()
 
@@ -35,6 +40,7 @@ async function main() {
     platform: "browser",
     target: "es2022",
     sourcemap: true,
+    define: { __BACKEND_URL__: BACKEND_URL },
   })
   await contentCtx.watch()
 

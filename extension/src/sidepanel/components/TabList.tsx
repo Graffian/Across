@@ -19,10 +19,30 @@ function formatTime(ts: number): string {
 function getStatusDot(status: string): string {
   switch (status) {
     case "embedded": return "bg-green-500"
-    case "chunked": return "bg-yellow-500"
-    case "extracting": return "bg-blue-500"
+    case "chunked": return "bg-yellow-500 animate-pulse"
+    case "extracting": return "bg-blue-500 animate-pulse"
     case "failed": return "bg-red-500"
     default: return "bg-slate-500"
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case "embedded": return "Indexed"
+    case "chunked": return "Processing..."
+    case "extracting": return "Reading..."
+    case "failed": return "Failed"
+    default: return "Queued"
+  }
+}
+
+function getStatusDescription(status: string): string {
+  switch (status) {
+    case "embedded": return "This page has been fully indexed. You can now chat about it."
+    case "chunked": return "Still processing this page. It will be ready to chat about shortly."
+    case "extracting": return "AI is currently reading this page. It will be indexed once complete."
+    case "failed": return "This page could not be indexed. Try reloading it."
+    default: return "This page is queued for indexing and will be processed soon."
   }
 }
 
@@ -74,11 +94,14 @@ export default function TabList({ tabs, onSelectTab, onDeleteTab, onSummarizeTab
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="truncate text-sm font-medium text-slate-200">{tab.title || "Untitled"}</div>
-                <div className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${getStatusDot(tab.status)}`} />
+                <div className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${getStatusDot(tab.status)}`} title={getStatusDescription(tab.status)} />
               </div>
               <div className="mt-0.5 flex items-center gap-2">
                 <span className="truncate text-xs text-slate-500">{tab.domain}</span>
                 <span className="shrink-0 rounded bg-slate-700/50 px-1.5 py-0.5 text-[10px] text-slate-500">{formatTime(tab.lastAccessedTime)}</span>
+                {tab.status !== "embedded" && (
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-slate-400">{getStatusLabel(tab.status)}</span>
+                )}
               </div>
             </div>
           </div>

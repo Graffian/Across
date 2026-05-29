@@ -6,11 +6,17 @@ import "../styles/globals.css"
 function StatusDot({ status }: { status: string }) {
   const color =
     status === "embedded" ? "bg-green-500"
-    : status === "chunked" ? "bg-yellow-500"
-    : status === "extracting" ? "bg-blue-500"
+    : status === "chunked" ? "bg-yellow-500 animate-pulse"
+    : status === "extracting" ? "bg-blue-500 animate-pulse"
     : status === "failed" ? "bg-red-500"
     : "bg-slate-500"
-  return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
+  const label =
+    status === "embedded" ? "This page has been fully indexed. You can now chat about it."
+    : status === "chunked" ? "Still processing this page. It will be ready to chat about shortly."
+    : status === "extracting" ? "AI is currently reading this page. It will be indexed once complete."
+    : status === "failed" ? "This page could not be indexed. Try reloading it."
+    : "This page is queued for indexing and will be processed soon."
+  return <span className={`inline-block h-2 w-2 rounded-full ${color}`} title={label} />
 }
 
 function Popup() {
@@ -42,7 +48,7 @@ function Popup() {
     <div className="w-80 bg-slate-900 text-slate-100">
       <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-across-600 text-[10px] font-bold text-white">A</div>
+          <img src={chrome.runtime.getURL("icon-48.png")} alt="Across" className="h-6 w-6 rounded-md" />
           <span className="text-sm font-semibold">Across</span>
         </div>
         <button onClick={openSidePanel} className="rounded-lg bg-across-600 px-2.5 py-1 text-[10px] font-medium text-white transition-colors hover:bg-across-500">Open Chat</button>
@@ -66,7 +72,10 @@ function Popup() {
         )}
       </div>
       <div className="border-t border-slate-700 px-4 py-2 text-center text-[10px] text-slate-600">
-        {tabs.length} tabs indexed &middot; {tabs.filter((t) => t.status === "embedded").length} embedded
+        {tabs.length} tabs &middot; {tabs.filter((t) => t.status === "embedded").length} indexed
+        {tabs.filter((t) => t.status === "extracting" || t.status === "chunked").length > 0 && (
+          <span className="ml-1 text-yellow-500">&middot; {tabs.filter((t) => t.status === "extracting" || t.status === "chunked").length} processing</span>
+        )}
       </div>
     </div>
   )

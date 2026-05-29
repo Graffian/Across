@@ -3,6 +3,18 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
+const EMBED_TIMEOUT_MS = 30_000
+
+async function embedFetch(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 const TARGET_DIM = 1024
 
 function padToDim(vec: number[], target = TARGET_DIM): number[] {
@@ -23,7 +35,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   private client: OpenAI
 
   constructor() {
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY!, timeout: EMBED_TIMEOUT_MS })
   }
 
   async embed(text: string): Promise<number[]> {
@@ -44,9 +56,31 @@ export class JinaAIEmbeddingProvider implements EmbeddingProvider {
   name = "Jina AI"
   private apiKey: string
   private endpoint = "https://api.jina.ai/v1/embeddings"
+  private concurrency = 0
+  private maxConcurrency = 2
+  private queue: Array<() => void> = []
 
   constructor() {
     this.apiKey = process.env.JINA_API_KEY!
+  }
+
+  private async acquire(): Promise<void> {
+    if (this.concurrency < this.maxConcurrency) {
+      this.concurrency++
+      return
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve)
+    })
+  }
+
+  private release(): void {
+    const next = this.queue.shift()
+    if (next) {
+      next()
+    } else {
+      this.concurrency--
+    }
   }
 
   async embed(text: string): Promise<number[]> {
@@ -55,28 +89,33 @@ export class JinaAIEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const response = await fetch(this.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "jina-embeddings-v3",
-        input: texts,
-        task: "retrieval.query",
-        dimensions: 1024,
-        truncate: true,
-      }),
-    })
+    await this.acquire()
+    try {
+      const response = await embedFetch(this.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "jina-embeddings-v3",
+          input: texts,
+          task: "retrieval.query",
+          dimensions: 1024,
+          truncate: true,
+        }),
+      })
 
-    if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Jina AI error ${response.status}: ${body}`)
+      if (!response.ok) {
+        const body = await response.text()
+        throw new Error(`Jina AI error ${response.status}: ${body}`)
+      }
+
+      const data = await response.json() as { data: { embedding: number[] }[] }
+      return data.data.map((item) => padToDim(item.embedding))
+    } finally {
+      this.release()
     }
-
-    const data = await response.json() as { data: { embedding: number[] }[] }
-    return data.data.map((item) => padToDim(item.embedding))
   }
 }
 
@@ -95,7 +134,7 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const response = await fetch(this.endpoint, {
+    const response = await embedFetch(this.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

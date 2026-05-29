@@ -1,3 +1,5 @@
+declare const __BACKEND_URL__: string | undefined
+
 export interface TabInfo {
   tabId: number
   url: string
@@ -131,7 +133,7 @@ export interface ExtensionSettings {
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   backend: {
-    baseUrl: "http://localhost:3001",
+    baseUrl: typeof __BACKEND_URL__ !== "undefined" ? __BACKEND_URL__ : "http://localhost:3001",
     enabled: false,
   },
   chunkSize: 800,

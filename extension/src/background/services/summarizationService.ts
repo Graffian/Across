@@ -2,7 +2,8 @@ import type { TabSummary, ContentChunk } from "../../lib/types"
 import { LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE, MAX_RETRIES, RETRY_DELAY_MS } from "../../lib/constants"
 import { storeSummary, getChunksByTabId } from "../../lib/indexedDB"
 
-const BACKEND_URL = "http://localhost:3001"
+declare const __BACKEND_URL__: string | undefined
+const BACKEND_URL = typeof __BACKEND_URL__ !== "undefined" ? __BACKEND_URL__ : "http://localhost:3001"
 
 async function summarizeViaBackend(chunks: ContentChunk[]): Promise<{ summary: string; keyPoints: string[] }> {
   const combinedContent = chunks.map((c) => `[${c.heading || "General"}]\n${c.content}`).join("\n\n")

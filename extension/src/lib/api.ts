@@ -60,7 +60,7 @@ export async function apiChat(message: string, history?: { role: string; content
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, history }),
-  })
+  }, 120000)
   if (!response.ok) throw new Error(`Chat failed: ${response.status}`)
   const data = await response.json()
   return data.response

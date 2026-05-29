@@ -54,6 +54,11 @@ async function processTab(tabId: number, url: string): Promise<void> {
   if (!tab) return
 
   try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    }).catch(() => {})
+
     const response = await chrome.tabs.sendMessage(tabId, { type: "EXTRACT_CONTENT", tabId, url })
     if (!response?.success || !response.content) {
       throw new Error(response?.error || "Content extraction failed")
@@ -93,7 +98,7 @@ function notifyIndexingProgress(tabId: number, status: string, progress: number)
   }).catch(() => {})
 }
 
-async function handleMessage(message: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean> {
+function handleMessage(message: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean {
   switch (message.type) {
     case "GET_TABS": {
       const tabs = tabMonitor.getAllTabs()
@@ -102,65 +107,56 @@ async function handleMessage(message: any, _sender: chrome.runtime.MessageSender
     }
 
     case "SEARCH_QUERY": {
-      try {
-        const payload = message.payload as SearchQuery
-        const results = await apiSearchChunks(payload.text, payload.topK || TOP_K_DEFAULT)
-        sendResponse({ type: "SEARCH_RESULTS", payload: results })
-      } catch {
-        sendResponse({ type: "SEARCH_RESULTS", payload: [] })
-      }
+      const payload = message.payload as SearchQuery
+      apiSearchChunks(payload.text, payload.topK || TOP_K_DEFAULT)
+        .then((results) => sendResponse({ type: "SEARCH_RESULTS", payload: results }))
+        .catch(() => sendResponse({ type: "SEARCH_RESULTS", payload: [] }))
       break
     }
 
     case "CHAT_MESSAGE": {
-      try {
-        const { message: userMessage, history } = message.payload
-        const response = await apiChat(userMessage, history || [])
-
-        sendResponse({
-          type: "CHAT_RESPONSE",
-          payload: { response },
+      const { message: userMessage, history } = message.payload
+      apiChat(userMessage, history || [])
+        .then((response) => sendResponse({ type: "CHAT_RESPONSE", payload: { response } }))
+        .catch((error) => {
+          const msg = error instanceof TypeError && error.message.includes("fetch")
+            ? "Couldn't reach the backend server. Make sure it's running and check your Settings."
+            : "Sorry, I encountered an error processing your question."
+          sendResponse({ type: "CHAT_RESPONSE", payload: { response: msg } })
         })
-      } catch (error) {
-        const msg = error instanceof TypeError && error.message.includes("fetch")
-          ? "Couldn't reach the backend server. Make sure it's running and check your Settings."
-          : "Sorry, I encountered an error processing your question."
-        sendResponse({
-          type: "CHAT_RESPONSE",
-          payload: { response: msg },
-        })
-      }
       break
     }
 
     case "GET_CHAT_HISTORY": {
-      const sessions = await getChatSessions()
-      sendResponse({ type: "CHAT_HISTORY", payload: sessions })
+      getChatSessions()
+        .then((sessions) => sendResponse({ type: "CHAT_HISTORY", payload: sessions }))
+        .catch(() => sendResponse({ type: "CHAT_HISTORY", payload: [] }))
       break
     }
 
     case "CLEAR_CHAT_HISTORY": {
-      await clearAllChatSessions()
-      sendResponse({ success: true })
+      clearAllChatSessions()
+        .then(() => sendResponse({ success: true }))
+        .catch(() => sendResponse({ success: false }))
       break
     }
 
     case "DELETE_TAB_DATA": {
       const tabId = message.tabId
-      await apiDeleteTabData(tabId)
-      tabMonitor["tabs"].delete(tabId)
-      chrome.runtime.sendMessage({ type: "TAB_REMOVED", payload: { tabId } }).catch(() => {})
-      sendResponse({ success: true })
+      apiDeleteTabData(tabId)
+        .then(() => {
+          tabMonitor["tabs"].delete(tabId)
+          chrome.runtime.sendMessage({ type: "TAB_REMOVED", payload: { tabId } }).catch(() => {})
+          sendResponse({ success: true })
+        })
+        .catch(() => sendResponse({ success: false }))
       break
     }
 
     case "SUMMARIZE_TAB": {
-      const summary = await generateSummary(message.tabId)
-      if (summary) {
-        sendResponse({ type: "TAB_SUMMARIZED", payload: summary })
-      } else {
-        sendResponse({ type: "TAB_SUMMARIZED", payload: null })
-      }
+      generateSummary(message.tabId)
+        .then((summary) => sendResponse({ type: "TAB_SUMMARIZED", payload: summary ?? null }))
+        .catch(() => sendResponse({ type: "TAB_SUMMARIZED", payload: null }))
       break
     }
   }

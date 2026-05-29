@@ -4,6 +4,18 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
+const LLM_TIMEOUT_MS = 60_000
+
+async function llmFetch(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export interface LLMProvider {
   chat(message: string, context: string, history?: { role: string; content: string }[]): Promise<string>
   summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }>
@@ -16,7 +28,7 @@ export class AnthropicLLMProvider implements LLMProvider {
   private model: string
 
   constructor() {
-    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY!, timeout: LLM_TIMEOUT_MS })
     this.model = process.env.DEFAULT_MODEL || "claude-sonnet-4-20250514"
   }
 
@@ -69,7 +81,7 @@ export class OpenAILLMProvider implements LLMProvider {
   private model: string
 
   constructor() {
-    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: LLM_TIMEOUT_MS })
     this.model = "gpt-4o-mini"
   }
 
@@ -119,7 +131,7 @@ export class GroqLLMProvider implements LLMProvider {
     const msgs: { role: string; content: string }[] = [{ role: "system", content: SYSTEM_PROMPT }]
     if (history) msgs.push(...history.map((h) => ({ role: h.role, content: h.content })))
     msgs.push({ role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` })
-    const response = await fetch(this.baseUrl, {
+    const response = await llmFetch(this.baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -143,7 +155,7 @@ export class GroqLLMProvider implements LLMProvider {
   }
 
   async summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }> {
-    const response = await fetch(this.baseUrl, {
+    const response = await llmFetch(this.baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -192,7 +204,7 @@ export class HuggingFaceLLMProvider implements LLMProvider {
     const msgs: { role: string; content: string }[] = [{ role: "system", content: SYSTEM_PROMPT }]
     if (history) msgs.push(...history.map((h) => ({ role: h.role, content: h.content })))
     msgs.push({ role: "user", content: `Context from browser tabs:\n\n${context}\n\nQuestion: ${message}` })
-    const response = await fetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
+    const response = await llmFetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -216,7 +228,7 @@ export class HuggingFaceLLMProvider implements LLMProvider {
   }
 
   async summarize(content: string, title: string): Promise<{ summary: string; keyPoints: string[] }> {
-    const response = await fetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
+    const response = await llmFetch(`${this.baseUrl}/${this.model}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

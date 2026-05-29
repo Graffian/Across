@@ -70,7 +70,14 @@ Backend (Node.js + Express + PostgreSQL)
 ### Message Passing
 - Use `chrome.runtime.sendMessage` for extension-wide
 - Use `chrome.tabs.sendMessage` for content script
-- Always return true from listeners for async responses
+- **Never declare listeners `async`** — they must `return true` synchronously to keep the channel open. Use `.then()` chains inside instead.
+- Always `return true` synchronously from listeners that call `sendResponse` asynchronously
+
+### Network Timeouts
+- All `fetch()` calls in backend services **must** use an `AbortController` timeout
+- LLM API calls: 60s timeout (Groq, HuggingFace, OpenAI, Anthropic)
+- Embedding API calls: 30s timeout (Jina AI, HuggingFace, OpenAI)
+- Use the existing helper or add a local `fetchWithTimeout` wrapper per service
 
 ## Development Commands
 
@@ -117,6 +124,13 @@ Load in Chrome: `chrome://extensions` → Developer mode → Load unpacked → s
 1. TabMonitor detects tab removal or URL change
 2. Calls DELETE /api/tabs/:tabId
 3. Backend removes rows from embeddings, chunks, summaries, and tabs tables
+
+## Development Notes
+
+### Common Pitfalls
+- **Chrome message channel closes prematurely**: `chrome.runtime.onMessage` listeners must NOT be `async`. An async function returns a Promise, not `true`, so Chrome closes the channel. Use a synchronous handler with `.then()` chains.
+- **Missing fetch timeouts**: Raw `fetch()` calls in backend providers have no default timeout. Always wrap with `AbortController` + `setTimeout`. The SDKs (OpenAI, Anthropic) also default to 10-minute timeouts if not explicitly set.
+- **When testing changes to the background service worker**, you must reload the extension in `chrome://extensions` (click the refresh icon on the extension card). Changes to the side panel UI hot-reload with the dev build.
 
 ## Testing Checklist
 

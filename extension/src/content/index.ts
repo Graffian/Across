@@ -73,14 +73,7 @@ function extractFallbackText(doc: Document): string {
     return cleanText(article.textContent || "")
   }
 
-  const paragraphs = doc.querySelectorAll("p")
-  const texts = Array.from(paragraphs)
-    .map((p) => p.textContent?.trim())
-    .filter((t): t is string => !!t && t.length > 20)
-
-  if (texts.length > 0) return texts.join("\n\n")
-
-  return cleanText(doc.body?.innerText || "")
+  return cleanText(doc.body?.textContent || doc.body?.innerText || "")
 }
 
 function cleanText(text: string): string {

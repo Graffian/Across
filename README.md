@@ -165,6 +165,18 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/across
 PORT=3001
 ```
 
+## Network Timeouts
+
+Across has explicit timeouts on all external API calls to prevent hanging:
+
+| Service | Timeout | Config |
+|---------|---------|--------|
+| LLM APIs (Groq, OpenAI, Anthropic, HuggingFace) | 60s | Hardcoded in `llmProvider.ts` |
+| Embedding APIs (Jina AI, HuggingFace, OpenAI) | 30s | Hardcoded in `embeddingProvider.ts` |
+| Extension ↔ Backend chat requests | 120s | Hardcoded in `extension/src/lib/api.ts` |
+
+These ensure a failing upstream API doesn't hang the chat or indexing pipeline.
+
 ## Getting Free API Keys
 
 - **Jina AI** (embeddings): [jina.ai/embeddings](https://jina.ai/embeddings) — sign up, 1M free tokens/month

@@ -2,6 +2,9 @@ import type { ContentChunk } from "../../lib/types"
 import { EMBEDDING_DIMENSION, EMBEDDING_MODEL, MAX_RETRIES, RETRY_DELAY_MS } from "../../lib/constants"
 import { apiStoreChunks } from "../../lib/api"
 
+declare const __BACKEND_URL__: string | undefined
+const BASE_URL = typeof __BACKEND_URL__ !== "undefined" ? __BACKEND_URL__ : "http://localhost:3001"
+
 interface EmbeddingProvider {
   embed(text: string): Promise<number[]>
   embedBatch(texts: string[]): Promise<number[][]>
@@ -44,7 +47,7 @@ let provider: EmbeddingProvider | null = null
 
 async function getProvider(): Promise<EmbeddingProvider> {
   if (provider) return provider
-  provider = new BackendEmbeddingProvider("http://localhost:3001")
+  provider = new BackendEmbeddingProvider(BASE_URL)
   return provider
 }
 
